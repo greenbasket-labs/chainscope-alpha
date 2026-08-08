@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "dev": "tsx watch --tsconfig tsconfig.json src/index.ts",
     "start": "node --enable-source-maps dist/index.mjs",
