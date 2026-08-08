@@ -797,7 +797,7 @@ router.get("/trader/simulation/log", (req: Request, res: Response): void => {
     const where = whereParts.length > 0 ? `WHERE ${whereParts.join(" AND ")}` : "";
 
     const entries = db.prepare(`
-      SELECT tsl.id, tsl.alert_id
+      SELECT tsl.id, tsl.alert_id,
              tsl.token_address, tsl.token_name, tsl.token_symbol,
              tsl.alert_level, tsl.alert_tier,
              tsl.decision, tsl.decision_reason,
@@ -1940,7 +1940,7 @@ function queueConfig(flowId: string): {
 
 /** Shared SQL for fetching sim log rows enriched with alert_profile + token launch_time */
 const SIM_LOG_QUERY = `
-  SELECT tsl.id, tsl.alert_id
+  SELECT tsl.id, tsl.alert_id,
          tsl.token_address, tsl.token_name, tsl.token_symbol,
          tsl.alert_tier,
          tsl.decision, tsl.decision_reason,
@@ -1986,7 +1986,7 @@ const LIVE_TRADE_SELECT = `
          status, bought_at, profit_usd, profit_pct,
          current_price_usd, tokens_purchased, entry_tx_hash,
          sold_at, exit_price_usd, exit_amount_usd, exit_tx_hash,
-         reason_closed, exit_market_cap_usd, exit_liquidity_usd
+         reason_closed
     FROM trader_trades
    WHERE alert_tier = ?
      AND status NOT IN ('FAILED', 'WAITING')
@@ -2135,7 +2135,7 @@ router.get("/trader/elite", (req: Request, res: Response): void => {
     const offset = parseInt((req.query.offset as string) ?? "0", 10);
 
     const simEntries = (db.prepare(`
-      SELECT tsl.id, tsl.alert_id
+      SELECT tsl.id, tsl.alert_id,
              tsl.token_address, tsl.token_name, tsl.token_symbol,
              tsl.alert_tier, tsl.decision, tsl.decision_reason,
              tsl.entry_price_usd, tsl.buy_amount_usd, tsl.slippage_pct,
@@ -2166,7 +2166,7 @@ router.get("/trader/pro", (req: Request, res: Response): void => {
     const offset = parseInt((req.query.offset as string) ?? "0", 10);
 
     const simEntries = (db.prepare(`
-      SELECT tsl.id, tsl.alert_id
+      SELECT tsl.id, tsl.alert_id,
              tsl.token_address, tsl.token_name, tsl.token_symbol,
              tsl.alert_tier, tsl.decision, tsl.decision_reason,
              tsl.entry_price_usd, tsl.buy_amount_usd, tsl.slippage_pct,
@@ -2196,7 +2196,7 @@ router.get("/trader/watch", (req: Request, res: Response): void => {
     const offset = parseInt((req.query.offset as string) ?? "0", 10);
 
     const rows = db.prepare(`
-      SELECT tsl.id, tsl.alert_id
+      SELECT tsl.id, tsl.alert_id,
              tsl.token_address, tsl.token_name, tsl.token_symbol,
              tsl.alert_tier,
              tsl.decision, tsl.decision_reason,

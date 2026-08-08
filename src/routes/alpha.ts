@@ -12,6 +12,49 @@ import { logger } from "../lib/logger.js";
 
 const router: import('express').Router = Router();
 
+// ── GET /tokens/:address ──────────────────────────────────────────────────────
+// Serves token metadata from alpha_candidates so the Alpha cockpit's
+// PortfolioCard does NOT need to call the ChainScope research api-server.
+// Returns the fields that PortfolioCard reads; research-only fields
+// (investigationStatus, ath, successProbability) are omitted / null.
+
+router.get("/tokens/:address", (req: Request, res: Response): void => {
+  const { address } = req.params;
+  const row = sqlite
+    .prepare(
+      `SELECT token_name AS name, symbol, market_cap AS currentMarketCap,
+              price_usd AS priceUsd, icon_url AS iconUrl,
+              pair_url AS pairUrl, polled_at AS lastSeen
+         FROM alpha_candidates
+        WHERE token_address = ?
+        LIMIT 1`
+    )
+    .get(address) as Record<string, unknown> | undefined;
+
+  if (!row) {
+    // Token not yet seen by the poller — return a minimal stub so the card
+    // renders without errors rather than returning 404.
+    res.json({
+      address,
+      name: null,
+      symbol: null,
+      currentMarketCap: null,
+      investigationStatus: null,
+      ath: null,
+      successProbability: null,
+    });
+    return;
+  }
+
+  res.json({
+    address,
+    ...row,
+    investigationStatus: null,
+    ath: null,
+    successProbability: null,
+  });
+});
+
 // ── GET /alpha/feed ───────────────────────────────────────────────────────────
 
 router.get("/alpha/feed", (req: Request, res: Response): void => {

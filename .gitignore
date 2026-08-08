@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Runtime database — never commit live data
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# Environment secrets
+.env
+.env.local
+.env.production
+
+# Logs
+*.log
+pino.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

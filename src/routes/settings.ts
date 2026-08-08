@@ -107,11 +107,21 @@ router.post("/settings/telegram/test", async (_req: Request, res: Response): Pro
 
 // ── GET /settings/flows ───────────────────────────────────────────────────────
 
+/** Strip raw token/chat_id values; return boolean _set flags instead. */
+function sanitizeFlow(flow: Record<string, unknown>): Record<string, unknown> {
+  const { telegram_bot_token, telegram_chat_id, ...rest } = flow;
+  return {
+    ...rest,
+    telegram_bot_token_set: !!(telegram_bot_token as string | null),
+    telegram_chat_id_set:   !!(telegram_chat_id  as string | null),
+  };
+}
+
 router.get("/settings/flows", (_req: Request, res: Response): void => {
   const flows = db
     .prepare("SELECT * FROM alert_flows ORDER BY priority ASC, id ASC")
-    .all();
-  res.json(flows);
+    .all() as Record<string, unknown>[];
+  res.json(flows.map(sanitizeFlow));
 });
 
 // ── PUT /settings/flows/:id ───────────────────────────────────────────────────
@@ -145,12 +155,12 @@ router.put("/settings/flows/:id", (req: Request, res: Response): void => {
   vals.push(id);
 
   db.prepare(`UPDATE alert_flows SET ${sets.join(", ")} WHERE id = ?`).run(...vals);
-  const flow = db.prepare("SELECT * FROM alert_flows WHERE id = ?").get(id);
+  const flow = db.prepare("SELECT * FROM alert_flows WHERE id = ?").get(id) as Record<string, unknown> | undefined;
   if (!flow) {
     res.status(404).json({ error: "Flow not found" });
     return;
   }
-  res.json(flow);
+  res.json(sanitizeFlow(flow));
 });
 
 export default router;
