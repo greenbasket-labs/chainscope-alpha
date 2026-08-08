@@ -1,0 +1,30 @@
+kind = "api"
+previewPath = "/alpha-api"
+title = "Alpha API"
+description = "Standalone Alpha trading backend — DexScreener poller, elite filter, simulation engine."
+version = "1.0.0"
+id = "artifacts/alpha-api"
+
+[[services]]
+localPort = 3001
+name = "web"
+paths = ["/alpha-api"]
+
+[services.development]
+run = "pnpm --filter @workspace/alpha-api run dev"
+
+[services.production.build]
+args = ["pnpm", "--filter", "@workspace/alpha-api", "run", "build"]
+
+[services.production.build.env]
+NODE_ENV = "production"
+
+[services.production.run]
+args = ["node", "--enable-source-maps", "artifacts/alpha-api/dist/index.mjs"]
+
+[services.production.run.env]
+PORT = "3001"
+NODE_ENV = "production"
+
+[services.env]
+PORT = "3001"
