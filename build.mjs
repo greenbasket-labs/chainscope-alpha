@@ -10,5 +10,6 @@
 import { execSync } from "node:child_process";
 
 console.log("Building Alpha API…");
-execSync("node_modules/.bin/tsc -p tsconfig.json", { stdio: "inherit" });
+// npx ensures tsc is found whether run standalone or from a monorepo.
+execSync("npx --yes tsc -p tsconfig.json", { stdio: "inherit" });
 console.log("Build complete → dist/");
