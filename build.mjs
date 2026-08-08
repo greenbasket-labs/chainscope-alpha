@@ -10,5 +10,5 @@
 import { execSync } from "node:child_process";
 
 console.log("Building Alpha API…");
-execSync("tsc -p tsconfig.json", { stdio: "inherit" });
+execSync("node_modules/.bin/tsc -p tsconfig.json", { stdio: "inherit" });
 console.log("Build complete → dist/");
