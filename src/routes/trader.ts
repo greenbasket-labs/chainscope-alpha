@@ -797,17 +797,15 @@ router.get("/trader/simulation/log", (req: Request, res: Response): void => {
     const where = whereParts.length > 0 ? `WHERE ${whereParts.join(" AND ")}` : "";
 
     const entries = db.prepare(`
-      SELECT tsl.id, tsl.alert_id, tsl.investigation_id,
+      SELECT tsl.id, tsl.alert_id
              tsl.token_address, tsl.token_name, tsl.token_symbol,
              tsl.alert_level, tsl.alert_tier,
              tsl.decision, tsl.decision_reason,
              tsl.entry_price_usd,
              tsl.buy_amount_usd, tsl.slippage_pct, tsl.priority_fee_lamports,
              tsl.expected_cost_usd, tsl.expected_tokens,
-             tsl.status, tsl.is_simulation, tsl.created_at,
-             ae.alert_profile
+             tsl.status, tsl.is_simulation, tsl.created_at
         FROM trader_simulation_log tsl
-        LEFT JOIN alert_events ae ON ae.id = tsl.alert_id
         ${where}
        ORDER BY tsl.created_at DESC
        LIMIT ? OFFSET ?
@@ -862,31 +860,37 @@ router.post("/trader/simulation/replay-alert", async (req: Request, res: Respons
       contract_address: string; flow_id: string | null;
     } | undefined;
 
-    if (alert_id) {
-      alertRow = db.prepare(`
-        SELECT ae.id, ae.token_id, ae.investigation_id, ae.evidence_score, ae.confidence,
-               ae.alert_profile, t.contract_address,
-               aqt.flow_id
-        FROM alert_events ae
-        JOIN tokens t ON t.id = ae.token_id
-        LEFT JOIN alert_queue_telegram aqt ON aqt.alert_id = ae.id
-        WHERE ae.id = ?
-        LIMIT 1
-      `).get(alert_id) as typeof alertRow;
-    } else {
-      // Pick most recent ELITE or PRO that isn't already in the sim log
-      alertRow = db.prepare(`
-        SELECT ae.id, ae.token_id, ae.investigation_id, ae.evidence_score, ae.confidence,
-               ae.alert_profile, t.contract_address,
-               aqt.flow_id
-        FROM alert_events ae
-        JOIN tokens t ON t.id = ae.token_id
-        LEFT JOIN alert_queue_telegram aqt ON aqt.alert_id = ae.id
-        WHERE aqt.flow_id IN ('ELITE','PRO')
-          AND ae.id NOT IN (SELECT DISTINCT alert_id FROM trader_simulation_log WHERE alert_id IS NOT NULL)
-        ORDER BY ae.created_at DESC
-        LIMIT 1
-      `).get() as typeof alertRow;
+    // alert_events does not exist in alpha.db — wrap in try-catch so this
+    // endpoint degrades gracefully (returns 404 "no eligible alert").
+    try {
+      if (alert_id) {
+        alertRow = db.prepare(`
+          SELECT ae.id, ae.token_id, ae.investigation_id, ae.evidence_score, ae.confidence,
+                 ae.alert_profile, t.contract_address,
+                 aqt.flow_id
+          FROM alert_events ae
+          JOIN tokens t ON t.id = ae.token_id
+          LEFT JOIN alert_queue_telegram aqt ON aqt.alert_id = ae.id
+          WHERE ae.id = ?
+          LIMIT 1
+        `).get(alert_id) as typeof alertRow;
+      } else {
+        // Pick most recent ELITE or PRO that isn't already in the sim log
+        alertRow = db.prepare(`
+          SELECT ae.id, ae.token_id, ae.investigation_id, ae.evidence_score, ae.confidence,
+                 ae.alert_profile, t.contract_address,
+                 aqt.flow_id
+          FROM alert_events ae
+          JOIN tokens t ON t.id = ae.token_id
+          LEFT JOIN alert_queue_telegram aqt ON aqt.alert_id = ae.id
+          WHERE aqt.flow_id IN ('ELITE','PRO')
+            AND ae.id NOT IN (SELECT DISTINCT alert_id FROM trader_simulation_log WHERE alert_id IS NOT NULL)
+          ORDER BY ae.created_at DESC
+          LIMIT 1
+        `).get() as typeof alertRow;
+      }
+    } catch {
+      // Table doesn't exist in this environment — alertRow stays undefined.
     }
 
     if (!alertRow) {
@@ -1312,10 +1316,14 @@ router.get("/trader/simulation/replay/:positionId", (req: Request, res: Response
       .prepare("SELECT * FROM trader_simulation_log WHERE id = ?")
       .get(position.sim_log_id) as Record<string, unknown> | undefined;
 
-    // Alert data
-    const alertData = logEntry?.alert_id
-      ? db.prepare("SELECT * FROM alert_events WHERE id = ?").get(logEntry.alert_id) as Record<string, unknown> | undefined
-      : undefined;
+    // Alert data (alert_events does not exist in alpha.db — returns undefined gracefully)
+    let alertData: Record<string, unknown> | undefined;
+    if (logEntry?.alert_id) {
+      try {
+        alertData = db.prepare("SELECT * FROM alert_events WHERE id = ?")
+          .get(logEntry.alert_id) as Record<string, unknown> | undefined;
+      } catch { /* table absent */ }
+    }
 
     // Exit events (partial sells, stop, expiry)
     const exits = db
@@ -1932,17 +1940,15 @@ function queueConfig(flowId: string): {
 
 /** Shared SQL for fetching sim log rows enriched with alert_profile + token launch_time */
 const SIM_LOG_QUERY = `
-  SELECT tsl.id, tsl.alert_id, tsl.investigation_id,
+  SELECT tsl.id, tsl.alert_id
          tsl.token_address, tsl.token_name, tsl.token_symbol,
          tsl.alert_tier,
          tsl.decision, tsl.decision_reason,
          tsl.entry_price_usd,
          tsl.buy_amount_usd, tsl.slippage_pct,
          tsl.expected_cost_usd, tsl.expected_tokens,
-         tsl.status, tsl.is_simulation, tsl.created_at,
-         ae.alert_profile
+         tsl.status, tsl.is_simulation, tsl.created_at
     FROM trader_simulation_log tsl
-    LEFT JOIN alert_events ae ON ae.id = tsl.alert_id
    ORDER BY tsl.created_at DESC
    LIMIT 2000
 `;
@@ -2129,14 +2135,13 @@ router.get("/trader/elite", (req: Request, res: Response): void => {
     const offset = parseInt((req.query.offset as string) ?? "0", 10);
 
     const simEntries = (db.prepare(`
-      SELECT tsl.id, tsl.alert_id, tsl.investigation_id,
+      SELECT tsl.id, tsl.alert_id
              tsl.token_address, tsl.token_name, tsl.token_symbol,
              tsl.alert_tier, tsl.decision, tsl.decision_reason,
              tsl.entry_price_usd, tsl.buy_amount_usd, tsl.slippage_pct,
              tsl.expected_cost_usd, tsl.expected_tokens,
              tsl.status, tsl.is_simulation, tsl.created_at
         FROM trader_simulation_log tsl
-        LEFT JOIN alert_events ae ON ae.id = tsl.alert_id
        WHERE tsl.alert_tier = 'ELITE'
        ORDER BY tsl.created_at DESC LIMIT 2000
     `).all() as Record<string, unknown>[]).map(enrichSimRow);
@@ -2161,14 +2166,13 @@ router.get("/trader/pro", (req: Request, res: Response): void => {
     const offset = parseInt((req.query.offset as string) ?? "0", 10);
 
     const simEntries = (db.prepare(`
-      SELECT tsl.id, tsl.alert_id, tsl.investigation_id,
+      SELECT tsl.id, tsl.alert_id
              tsl.token_address, tsl.token_name, tsl.token_symbol,
              tsl.alert_tier, tsl.decision, tsl.decision_reason,
              tsl.entry_price_usd, tsl.buy_amount_usd, tsl.slippage_pct,
              tsl.expected_cost_usd, tsl.expected_tokens,
              tsl.status, tsl.is_simulation, tsl.created_at
         FROM trader_simulation_log tsl
-        LEFT JOIN alert_events ae ON ae.id = tsl.alert_id
        WHERE tsl.alert_tier = 'PRO'
        ORDER BY tsl.created_at DESC LIMIT 2000
     `).all() as Record<string, unknown>[]).map(enrichSimRow);
@@ -2192,17 +2196,15 @@ router.get("/trader/watch", (req: Request, res: Response): void => {
     const offset = parseInt((req.query.offset as string) ?? "0", 10);
 
     const rows = db.prepare(`
-      SELECT tsl.id, tsl.alert_id, tsl.investigation_id,
+      SELECT tsl.id, tsl.alert_id
              tsl.token_address, tsl.token_name, tsl.token_symbol,
              tsl.alert_tier,
              tsl.decision, tsl.decision_reason,
              tsl.entry_price_usd,
              tsl.buy_amount_usd, tsl.slippage_pct,
              tsl.expected_cost_usd, tsl.expected_tokens,
-             tsl.status, tsl.is_simulation, tsl.created_at,
-             ae.alert_profile
+             tsl.status, tsl.is_simulation, tsl.created_at
         FROM trader_simulation_log tsl
-        LEFT JOIN alert_events ae ON ae.id = tsl.alert_id
        WHERE tsl.alert_tier = 'WATCH'
        ORDER BY tsl.created_at DESC
        LIMIT 2000
