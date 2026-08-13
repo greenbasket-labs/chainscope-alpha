@@ -6,8 +6,9 @@
  *   2. Seed DB defaults (alert_flows, trader_config, etc.)
  *   3. Register market-bus subscribers (positionTracker, liveSellTracker)
  *   4. Start simulation engine (subscribes to alertBus)
- *   5. Start DexScreener poller
- *   6. Start HTTP server
+ *   5. Start MINTLINE bridge (disabled unless explicitly enabled)
+ *   6. Start DexScreener poller
+ *   7. Start HTTP server
  */
 
 import { runMigration } from "./db/migrate.js";
@@ -15,6 +16,7 @@ import { seedDatabase } from "./db/seed.js";
 import { createApp } from "./app.js";
 import { logger } from "./lib/logger.js";
 import { startPoller } from "./dexscreener/poller.js";
+import { startMintlineBridge } from "./trader/mintlineBridge.js";
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 
@@ -38,10 +40,13 @@ async function boot(): Promise<void> {
   const { startLiveSellTracker } = await import("./trader/liveSellTracker.js");
   startLiveSellTracker();
 
-  // 5. DexScreener poller
+  // 5. Start MINTLINE bridge (disabled unless explicitly enabled)
+  startMintlineBridge();
+
+  // 6. DexScreener poller
   startPoller();
 
-  // 6. HTTP server
+  // 7. HTTP server
   const app  = createApp();
   const port = parseInt(process.env.PORT ?? "3001", 10);
 
