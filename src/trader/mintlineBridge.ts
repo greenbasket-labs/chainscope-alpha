@@ -1,4 +1,5 @@
 import { alertBus, type NewAlertEvent } from "./alertBus.js";
+import { sqlite } from "../db/index.js";
 import { logger } from "../lib/logger.js";
 
 const enabled = process.env.MINTLINE_BRIDGE_ENABLED === "true";
@@ -16,10 +17,13 @@ async function forward(event: NewAlertEvent): Promise<void> {
   const key = event.tokenAddress;
   if (sent.has(key)) return;
 
-  const profile = event.alertProfile ?? {};
-  const buyPrice = Number(profile.priceUsd ?? 0);
+  const row = sqlite
+    .prepare("SELECT price_usd FROM alpha_candidates WHERE id = ? LIMIT 1")
+    .get(event.tokenId) as { price_usd: number | null } | undefined;
+  const buyPrice = Number(row?.price_usd ?? 0);
+
   if (!Number.isFinite(buyPrice) || buyPrice <= 0) {
-    logger.warn({ token: key }, "MINTLINE bridge skipped: alert has no valid priceUsd");
+    logger.warn({ token: key }, "MINTLINE bridge skipped: no valid current price");
     return;
   }
 
