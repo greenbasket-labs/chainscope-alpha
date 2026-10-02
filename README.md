@@ -1,41 +1,54 @@
-# Alpha API
+# ChainScope Alpha API
 
-Standalone Express + SQLite trading backend for the Alpha cockpit.
+Standalone Express + SQLite backend for an experimental Alpha cockpit.
 
-**Fully independent** — no dependency on the ChainScope research database,
-investigation corpus, or research workers.
+> **Portfolio context:** This is an **early standalone ChainScope experiment**, not the canonical ChainScope research architecture. It is retained because it demonstrates API design, token discovery, configurable filtering, alert flows, simulation, and execution-safety controls.
+
+## What it demonstrates
+
+- Express/TypeScript API design
+- SQLite-backed application state
+- Fresh-token discovery
+- Configurable candidate filtering
+- Alert/signal queues
+- Telegram integration
+- Simulation-oriented trading workflows
+- Explicit execution safety defaults
+- Render deployment configuration
 
 ## Architecture
 
 ```
-Alpha cockpit (chainscope-alpha/)
-        ↓
-Alpha API (this service)
-        ↓
-DexScreener fresh-token discovery (3-min poller)
-        ↓
-Elite filter (configurable profile + gold dataset)
-        ↓
-Telegram alerts
-        ↓
-Simulation engine / live execution
+Alpha cockpit
+     ↓
+Alpha API
+     ↓
+Token discovery
+     ↓
+Configurable filter
+     ↓
+Alerts / signal queues
+     ↓
+Simulation or controlled execution
 ```
 
-## Execution safety defaults
+This service is deliberately independent from the ChainScope research database, investigation corpus, and research workers.
+
+## Execution safety
+
+Real trading is **disabled by default**.
 
 | Setting | Default |
 |---|---|
 | `execution_mode` | `OFF` |
 | `auto_trading_enabled` | `false` |
-| `live_trading_enabled` | `false` (all flows) |
+| `live_trading_enabled` | `false` |
 
-**Real trading is disabled by default and requires explicit database configuration.**
-
----
+Any future live-execution work should remain explicit, separately configured, and independently verified.
 
 ## Local development
 
-### Prerequisites
+### Requirements
 
 - Node.js 20+
 - pnpm 9+
@@ -48,13 +61,13 @@ pnpm install
 
 ### Environment
 
-Copy `.env.example` to `.env` and set at minimum `SESSION_SECRET`:
-
 ```bash
 cp .env.example .env
 ```
 
-### Start (dev, hot-reload)
+At minimum, production requires `SESSION_SECRET`.
+
+### Run
 
 ```bash
 pnpm dev
@@ -62,65 +75,37 @@ pnpm dev
 
 The API starts on `http://localhost:3001`.
 
----
-
 ## Production build
 
 ```bash
-pnpm build     # compiles TypeScript → dist/
-pnpm start     # runs dist/index.mjs
+pnpm build
+pnpm start
 ```
 
-Or with `node` directly:
+## Key API areas
 
-```bash
-node build.mjs
-node --enable-source-maps dist/index.mjs
-```
+- Candidate/token feed
+- Token metadata
+- Flow configuration
+- Trader configuration
+- Signal queues
+- Elite-filter profiles
+- Synthetic test-alert injection
 
----
+## Relationship to ChainScope
 
-## Environment variables
+The broader ChainScope direction is an evidence-first blockchain behavior research platform:
 
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `PORT` | No | `3001` | HTTP port |
-| `SESSION_SECRET` | **Yes (prod)** | dev fallback | AES-256-GCM key for wallet encryption |
-| `DATA_ROOT` | No | `<cwd>/data` | Directory for `alpha.db` |
-| `ALLOWED_ORIGIN` | No | `*` | CORS allowed origin |
-| `NODE_ENV` | No | `development` | `production` enables JSON logging |
-| `LOG_LEVEL` | No | `info` | Pino log level |
+**collect evidence → measure behavior → compare observations → discover recurring patterns**
 
----
+This repository is one historical/experimental implementation path and should not be treated as the canonical ChainScope architecture.
 
-## Render deployment
+## Status
 
-1. Create a new **Web Service** pointing at this directory (or a Git repo containing it).
-2. **Build command:** `pnpm install && pnpm build`
-3. **Start command:** `pnpm start`
-4. Add a **Persistent Disk** mounted at `/var/data` (stores `alpha.db`).
-5. Set environment variables:
-   - `SESSION_SECRET` — a long random string
-   - `DATA_ROOT` — `/var/data`
-   - `NODE_ENV` — `production`
+**Experimental / standalone research and engineering component.**
 
----
+For the current ChainScope research direction, use the dedicated ChainScope repositories.
 
-## Key endpoints
+## Author
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/` | Health check |
-| `GET` | `/api/alpha/feed` | DexScreener candidates |
-| `GET` | `/api/tokens/:address` | Token metadata from candidate pool |
-| `GET` | `/api/settings/flows` | Alert flow configuration |
-| `PUT` | `/api/settings/flows/:id` | Update a flow |
-| `GET` | `/api/trader/config` | Trader configuration |
-| `GET` | `/api/trader/buy-settings` | Per-tier buy amounts |
-| `GET` | `/api/trader/elite` | ELITE signal queue |
-| `GET` | `/api/trader/pro` | PRO signal queue |
-| `GET` | `/api/trader/watch` | WATCH signal queue |
-| `GET` | `/api/trader/ignition` | IGNITION signal queue |
-| `GET` | `/api/trader/watch-for-upgrade` | Watch-for-upgrade queue |
-| `GET` | `/api/elite-filter/profiles` | Elite filter profiles |
-| `POST` | `/api/trader/alert/inject-test` | Inject synthetic test alert |
+**Mohammed Musbahu Abdullahi**
